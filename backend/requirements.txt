@@ -1,0 +1,9 @@
+langgraph
+band-sdk[langgraph]
+langchain-groq
+python-dotenv
+thenvoi-sdk[langgraph]
+livekit-api
+fastapi
+uivcorn
+python-dotenv
