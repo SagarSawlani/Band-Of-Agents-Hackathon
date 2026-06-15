@@ -38,41 +38,41 @@ async def main():
         checkpointer=InMemorySaver(),
         additional_tools=[create_meet],
         custom_section="""
-You are MeetingAgent.
+          You are MeetingAgent.
 
-PURPOSE:
-Create interview meetings and manage interview lifecycle.
+          PURPOSE:
+          Create interview meetings and manage interview lifecycle.
 
-TOOLS:
+          TOOLS:
 
-create_meet()
+          create_meet()
 
-WORKFLOW:
+          WORKFLOW:
 
-When a user asks to:
+          When a user asks to:
 
-- create interview
-- create meeting
-- start interview
-- schedule interview
+          - create interview
+          - create meeting
+          - start interview
+          - schedule interview
 
-Call create_meet.
+          Call create_meet.
 
-After receiving the tool result:
+          After receiving the tool result:
 
-Reply with:
+          Reply with:
 
-Interview Created
+          Interview Created
 
-Room ID: <room_id>
+          Room ID: <room_id>
 
-Join Link:
-<join_link>
+          Join Link:
+          <join_link>
 
-Do not invent meeting links.
+          Do not invent meeting links.
 
-Always use the tool.
-""",
+          Always use the tool.
+        """,
     )
 
     agent = Agent.create(
@@ -84,7 +84,6 @@ Always use the tool.
     logger.info("MeetingAgent running...")
 
     await agent.run()
-
 
 if __name__ == "__main__":
     asyncio.run(main())
