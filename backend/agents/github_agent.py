@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
 
-from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 
 from langgraph.checkpoint.memory import InMemorySaver
 
@@ -28,8 +28,10 @@ async def main():
     agent_id = os.getenv("GITHUB_AGENT_ID")
     api_key = os.getenv("GITHUB_AGENT_KEY")
 
-    llm = ChatGroq(
-        model="meta-llama/llama-4-scout-17b-16e-instruct",
+    llm = ChatOpenAI(
+        api_key=os.getenv("AIMLAPI_KEY"),
+        base_url="https://api.aimlapi.com/v1",
+        model="gpt-4o-mini",
         temperature=0.2,
     )
 
@@ -50,12 +52,19 @@ async def main():
 
           WORKFLOW:
 
-          When a user:
-            - Gives the GitHub username / GitHib profile link use the github_profile_stats tool
-            - Gives the GitHub repository Link / repository path use the projects_reviewer tool
-            - Gives both, use both the tools
-
-          Always use the tool/tools.
+          You MUST ALWAYS run BOTH the github_profile_stats tool AND the projects_reviewer tool.
+          
+          If the user provides a GitHub profile link or username (but no specific repositories):
+            1. Run github_profile_stats(username)
+            2. Run projects_reviewer(role, username=username) 
+          
+          If the user explicitly provides specific repository links with or without stating they are hyperlinks:
+            1. Run github_profile_stats(username)
+            2. Run projects_reviewer(role, repos=[repo1, repo2])
+            
+          Always use both tools before generating your final output.
+          
+          CRITICAL RULE: You MUST start your final response message by tagging @CandidateOverviewAgent so it knows you have finished. (e.g. "@CandidateOverviewAgent Here is the github analysis...")
         """,
     )
 

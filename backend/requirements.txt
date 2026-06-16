@@ -1,10 +1,15 @@
 langgraph
 band-sdk[langgraph]
 langchain-groq
+langchain-openai
 python-dotenv
 thenvoi-sdk[langgraph]
 livekit-api
+livekit
+groq
 fastapi
 uvicorn
-python-dotenv
 PyGithub
+requests
+pdfminer.six 
+python-docx

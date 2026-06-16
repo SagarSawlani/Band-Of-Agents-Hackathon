@@ -1,5 +1,5 @@
 from github import Github
-from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -9,12 +9,12 @@ import os
 
 load_dotenv()
 
-llm = ChatGroq(
-  model="meta-llama/llama-4-scout-17b-16e-instruct",
+llm = ChatOpenAI(
+  api_key=os.getenv("AIMLAPI_KEY"),
+  base_url="https://api.aimlapi.com/v1",
+  model="gpt-4o-mini",
   temperature=0,
-  max_tokens=None,
-  timeout=None,
-  max_retries=2,
+  streaming=False,
 )
 
 def creation_date(user):
@@ -340,11 +340,25 @@ def github_profile_stats(username):
   return profile_stats
 
 @tool
-def projects_reviewer(role, repos):
+def projects_reviewer(role, repos=None, username=None):
   """
     For the given role and github repositories, this tool reviews the code in each repository.
     repos must be a list of full repository paths in 'owner/repo' format, e.g. ['SagarSawlani/Band-Of-Agents-Hackathon']
+    If repos is not provided, you MUST provide a username, and it will review their top 3 public repositories.
   """
+  repos = repos or []
+  if not repos and username:
+    try:
+      user = g.get_user(username)
+      user_repos = list(user.get_repos(type="owner"))
+      user_repos.sort(key=lambda x: x.stargazers_count, reverse=True)
+      repos = [repo.full_name for repo in user_repos[:2]] # Top 2 repos to save time/context
+    except Exception:
+      pass
+
+  if not repos:
+    return "No repositories found to review."
+
   projects_review = ""
   for repo in repos:
     projects_review += code_reviewer(role, repo)

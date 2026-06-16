@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
 
-from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 
 from langgraph.checkpoint.memory import InMemorySaver
 
@@ -27,8 +27,10 @@ async def main():
     agent_id = os.getenv("RESUME_AGENT_ID")
     api_key = os.getenv("RESUME_AGENT_KEY")
 
-    llm = ChatGroq(
-        model="llama-3.3-70b-versatile",
+    llm = ChatOpenAI(
+        api_key=os.getenv("AIMLAPI_KEY"),
+        base_url="https://api.aimlapi.com/v1",
+        model="gpt-4o-mini",
         temperature=0.2,
     )
 
@@ -44,29 +46,30 @@ async def main():
 
           TOOLS:
 
-          resume_facts_extraction()
-          resume_evaluator()
-          interview_questions()
+          resume_facts_extraction(link)
+          resume_evaluator(structured_resume_json, role)
+          interview_questions(structured_resume_json, role)
+
+          CRITICAL RULES:
+          - When calling resume_facts_extraction, you MUST pass the EXACT Google Drive URL as the 'link' parameter.
+          - Do NOT shorten, modify, paraphrase, or extract parts of the URL. Copy it character-for-character.
+          - Example: if you receive "https://drive.google.com/file/d/1EmilKT9ZPhAcWecAcVWJEsAEUzdRFWw9/view?usp=drivesdk", pass that EXACT string.
 
           WORKFLOW:
 
-          When resume google drive link:
-
-          Call resume_facts_extraction and pass the link as a parameter.
-
-          After receiving the tool result:
-
-          reply with a resume overview (convert JSON to explainable words), if you find something which is non-useful, discard it
-
-          Now take the JSON Output recieved from resume_facts_extraction tool and pass it into resume_evaluator along with the job role given by the user.
-
-          After receiving the tool result:
-          reply with a Role Fit Analysis (convert JSON to explainable words), if you find something which is non-useful, discard it
-
-          Now take the JSON Output recieved from resume_facts_extraction tool and pass it into interview_questions tool along with the job role given by the user.
-          After receiving the tool result:
-          reply with the interview questions which came into the output, the category on the next line and the answer points on the next, between each set of questions keep a one line gap to ensure readability
-          Always use the tool.
+          1. Call `resume_facts_extraction` and pass the EXACT google drive link.
+          2. Wait for the tool result. Once received, pass that JSON output AND the user's job role into `resume_evaluator`.
+          3. Wait for the tool result. Once received, pass that JSON output AND the user's job role into `interview_questions`.
+          4. Wait for all three tools to finish. 
+          
+          5. ONCE ALL THREE TOOLS HAVE FINISHED, generate a SINGLE comprehensive reply containing:
+             - @CandidateOverviewAgent (You MUST start your message with this tag)
+             - A Resume Overview (convert the facts JSON into explainable words)
+             - A Role Fit Analysis (convert the evaluator JSON into explainable words)
+             - Interview Questions (formatted clearly with categories and answer points)
+             - GitHub Links Found (explicitly list all GitHub profile and repository links found in the raw text or JSON)
+             
+          DO NOT send any messages until all three tools have finished executing.
         """
     )
 
