@@ -22,11 +22,12 @@ logger = logging.getLogger(__name__)
 
 # --- GLOBAL STATE FOR THE BACKGROUND AUDIO LOOP ---
 transcript_buffer = []
+full_transcript_buffer = []
 is_listening = False
 # --------------------------------------------------
 
 async def handle_audio_stream(track: rtc.RemoteAudioTrack, speaker_name: str, agent_id: str, api_key: str, thenvoi_chat_id: str):
-    global transcript_buffer
+    global transcript_buffer, full_transcript_buffer
     audio_stream = rtc.AudioStream(track)
     
     buffer = bytearray()
@@ -50,6 +51,7 @@ async def handle_audio_stream(track: rtc.RemoteAudioTrack, speaker_name: str, ag
             if text and len(text) > 5: 
                 chunk_str = f"[{speaker_name}]: {text}"
                 transcript_buffer.append(chunk_str)
+                full_transcript_buffer.append(chunk_str)
                 logger.info(f"Transcribed: {chunk_str}")
                 
                 # If we hit 3 chunks, trigger the LLM!
@@ -125,6 +127,70 @@ async def connect_to_livekit_bg(room_name: str, agent_id: str, api_key: str, the
         if track.kind == rtc.TrackKind.KIND_AUDIO:
             asyncio.create_task(handle_audio_stream(track, participant.identity, agent_id, api_key, thenvoi_chat_id))
 
+    @room.on("participant_disconnected")
+    def on_participant_disconnected(participant: rtc.RemoteParticipant):
+        logger.info(f"Participant left the room: {participant.identity}")
+        
+        async def check_and_disconnect():
+            await asyncio.sleep(1) # wait for internal state to update
+            if not room.remote_participants:
+                logger.info("No humans left in the room. Disconnecting agent to finalize transcript...")
+                await room.disconnect()
+                
+        asyncio.create_task(check_and_disconnect())
+
+    @room.on("disconnected")
+    def on_disconnected(*args, **kwargs):
+        logger.info("Room disconnected!")
+        if not full_transcript_buffer:
+            return
+            
+        combined_transcript = "\n".join(full_transcript_buffer)
+        
+        async def push_transcript():
+            logger.info("Pushing full transcript to Band.ai UI...")
+            async with httpx.AsyncClient() as client:
+                base_url = f"https://app.thenvoi.com/api/v1/agent/chats/{thenvoi_chat_id}"
+                
+                # Fetch user ID to mention them
+                res = await client.get(f"{base_url}/participants", headers={"X-API-Key": api_key})
+                participants = res.json().get("data", [])
+                
+                user_id = None
+                for p in participants:
+                    if p.get("type") == "User":
+                        user_id = p["id"]
+                        break
+                
+                # Also mention the Plagiarism Agent so it processes the transcript
+                plagiarism_agent_id = os.getenv("PLAGIARISM_AGENT_ID")
+                
+                mentions = []
+                if user_id:
+                    mentions.append({"id": user_id})
+                if plagiarism_agent_id:
+                    mentions.append({"id": plagiarism_agent_id})
+
+                payload = {
+                    "message": {
+                        "content": f"📄 **Full Interview Transcript:**\n\n{combined_transcript}",
+                        "mentions": mentions
+                    }
+                }
+                
+                final_res = await client.post(
+                    f"{base_url}/messages",
+                    headers={"X-API-Key": api_key},
+                    json=payload
+                )
+                
+                if final_res.status_code in [200, 201]:
+                    logger.info("🎉 Successfully pushed full transcript to Band.ai UI!")
+                else:
+                    logger.error(f"Failed to push transcript. API returned: {final_res.text}")
+        
+        asyncio.create_task(push_transcript())
+
     await room.connect(url, token)
     logger.info(f"Successfully connected to LiveKit room: {room_name}")
 
@@ -149,6 +215,18 @@ async def connect_to_interview(livekit_room_id: str, config: RunnableConfig):
     return "Already listening or missing Chat ID."
 
 
+@tool
+async def get_full_transcript() -> str:
+    """
+    Call this tool when the user asks for the full transcript of the meet.
+    It returns the complete, real-time updated transcript of the interview.
+    """
+    global full_transcript_buffer
+    if not full_transcript_buffer:
+        return "The transcript is currently empty. No one has spoken yet or the interview hasn't started."
+    return "\n".join(full_transcript_buffer)
+
+
 async def main():
     load_dotenv()
 
@@ -165,7 +243,7 @@ async def main():
     adapter = LangGraphAdapter(
         llm=llm,
         checkpointer=InMemorySaver(),
-        additional_tools=[connect_to_interview],
+        additional_tools=[connect_to_interview, get_full_transcript],
         custom_section="""
           You are InterviewAgent, an AI copilot assisting a human interviewer.
           
@@ -178,6 +256,7 @@ async def main():
           3. Reply acknowledging that you are connected, and output a brief 2-sentence summary of the candidate's profile to prepare the interviewer.
           4. Every few minutes, you will receive batches of live transcript chunks automatically.
           5. When you receive transcript chunks, compare them to the candidate's overview, and generate 1 highly specific follow-up question for the human interviewer to ask.
+          6. If a user asks you for the full transcript of the meet, use the `get_full_transcript` tool and provide it to them.
         """
     )
 
