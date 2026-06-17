@@ -90,14 +90,19 @@ async def main():
           5. ONCE BOTH AGENTS HAVE REPLIED, you MUST call the `save_and_fetch_candidate_snapshot` tool. Pass the candidate's name, email, and the raw text outputs from the Resume and GitHub agents. 
           6. Wait for the tool result. If it returns a PREVIOUS SNAPSHOT, you MUST perform a "Delta Analysis" (analyze how much the candidate's skills have grown since their last application!).
           
-          7. FINALLY, generate a single final message.
-             - You MUST tag @InterviewAgent at the very beginning of this message.
-             - You MUST include a LiveKit Room ID for the interview (you can make up a unique ID like "interview-room-123").
-             - You MUST include the completely synthesized profile overview and suggested interview questions based on all the data.
-             - If they are a returning candidate, you MUST include a "📈 Growth Delta Report" summarizing how much they have improved since their last interview!
-             
-          Example of Final Message:
-          "@InterviewAgent Here is the Candidate Overview. The LiveKit Room ID is: test-room-123. [Insert full synthesized overview here. Insert Growth Delta Report if returning candidate.]"
+          7. FINALLY, you MUST output your final message using EXACTLY this markdown template. Do NOT deviate:
+          
+          @InterviewAgent
+          # 📋 Candidate Overview
+          [Synthesize the resume and github data into a summary]
+          
+          # 📈 Growth Delta Report
+          [ONLY IF THEY ARE A RETURNING CANDIDATE: Compare their old snapshot to their new snapshot and explicitly detail what new skills or projects they have gained since last time. If they are a new candidate, write "First-time applicant."]
+          
+          # ❓ Suggested Interview Questions
+          [Insert suggested questions]
+          
+          **LiveKit Room ID:** interview-room-123
         """
     )
 
