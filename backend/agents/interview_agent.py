@@ -28,10 +28,14 @@ is_listening = False
 
 async def handle_audio_stream(track: rtc.RemoteAudioTrack, speaker_name: str, agent_id: str, api_key: str, thenvoi_chat_id: str):
     global transcript_buffer, full_transcript_buffer
-    audio_stream = rtc.AudioStream(track)
+    # Request 16kHz mono audio directly from LiveKit
+    # Whisper was trained on 16kHz audio — feeding it 48kHz causes quality loss
+    audio_stream = rtc.AudioStream(track, sample_rate=16000, num_channels=1)
     
     buffer = bytearray()
     frame_count = 0
+    previous_text = ""
+    logged_format = False
     
     logger.info(f"Started listening to {speaker_name}...")
     
@@ -40,15 +44,21 @@ async def handle_audio_stream(track: rtc.RemoteAudioTrack, speaker_name: str, ag
         buffer.extend(frame.data)
         frame_count += 1
         
-        # Process every ~10 seconds of audio
-        if frame_count >= 1000:
+        if not logged_format:
+            logger.info(f"Audio format: {frame.sample_rate}Hz, {frame.num_channels}ch, frame_size={len(frame.data)} bytes")
+            logged_format = True
+        
+        # Send to Whisper every ~15 seconds (1500 frames)
+        # Longer chunks give Whisper much more context to work with
+        if frame_count >= 1500:
             pcm_data = bytes(buffer)
             buffer.clear()
             frame_count = 0
             
-            text = await transcribe_audio_chunk(pcm_data, frame.sample_rate, frame.num_channels)
+            text = await transcribe_audio_chunk(pcm_data, frame.sample_rate, frame.num_channels, previous_text=previous_text)
             
             if text and len(text) > 5: 
+                previous_text = text # Save this sentence to give Whisper context for the next one!
                 chunk_str = f"[{speaker_name}]: {text}"
                 transcript_buffer.append(chunk_str)
                 full_transcript_buffer.append(chunk_str)
@@ -134,62 +144,54 @@ async def connect_to_livekit_bg(room_name: str, agent_id: str, api_key: str, the
         async def check_and_disconnect():
             await asyncio.sleep(1) # wait for internal state to update
             if not room.remote_participants:
-                logger.info("No humans left in the room. Disconnecting agent to finalize transcript...")
+                logger.info("No humans left in the room. Pushing final transcript and disconnecting...")
+                
+                if full_transcript_buffer:
+                    combined_transcript = "\n".join(full_transcript_buffer)
+                    logger.info("Pushing full transcript to Band.ai UI...")
+                    async with httpx.AsyncClient() as client:
+                        base_url = f"https://app.thenvoi.com/api/v1/agent/chats/{thenvoi_chat_id}"
+                        
+                        # Fetch user ID to mention them
+                        res = await client.get(f"{base_url}/participants", headers={"X-API-Key": api_key})
+                        participants = res.json().get("data", [])
+                        
+                        user_id = None
+                        for p in participants:
+                            if p.get("type") == "User":
+                                user_id = p["id"]
+                                break
+                        
+                        # Also mention the Plagiarism Agent so it processes the transcript
+                        plagiarism_agent_id = os.getenv("PLAGIARISM_AGENT_ID")
+                        
+                        mentions = []
+                        if user_id:
+                            mentions.append({"id": user_id})
+                        if plagiarism_agent_id:
+                            mentions.append({"id": plagiarism_agent_id})
+
+                        payload = {
+                            "message": {
+                                "content": f"📄 **Full Interview Transcript:**\n\n{combined_transcript}",
+                                "mentions": mentions
+                            }
+                        }
+                        
+                        final_res = await client.post(
+                            f"{base_url}/messages",
+                            headers={"X-API-Key": api_key},
+                            json=payload
+                        )
+                        
+                        if final_res.status_code in [200, 201]:
+                            logger.info("🎉 Successfully pushed full transcript to Band.ai UI!")
+                        else:
+                            logger.error(f"Failed to push transcript. API returned: {final_res.text}")
+
                 await room.disconnect()
                 
         asyncio.create_task(check_and_disconnect())
-
-    @room.on("disconnected")
-    def on_disconnected(*args, **kwargs):
-        logger.info("Room disconnected!")
-        if not full_transcript_buffer:
-            return
-            
-        combined_transcript = "\n".join(full_transcript_buffer)
-        
-        async def push_transcript():
-            logger.info("Pushing full transcript to Band.ai UI...")
-            async with httpx.AsyncClient() as client:
-                base_url = f"https://app.thenvoi.com/api/v1/agent/chats/{thenvoi_chat_id}"
-                
-                # Fetch user ID to mention them
-                res = await client.get(f"{base_url}/participants", headers={"X-API-Key": api_key})
-                participants = res.json().get("data", [])
-                
-                user_id = None
-                for p in participants:
-                    if p.get("type") == "User":
-                        user_id = p["id"]
-                        break
-                
-                # Also mention the Plagiarism Agent so it processes the transcript
-                plagiarism_agent_id = os.getenv("PLAGIARISM_AGENT_ID")
-                
-                mentions = []
-                if user_id:
-                    mentions.append({"id": user_id})
-                if plagiarism_agent_id:
-                    mentions.append({"id": plagiarism_agent_id})
-
-                payload = {
-                    "message": {
-                        "content": f"📄 **Full Interview Transcript:**\n\n{combined_transcript}",
-                        "mentions": mentions
-                    }
-                }
-                
-                final_res = await client.post(
-                    f"{base_url}/messages",
-                    headers={"X-API-Key": api_key},
-                    json=payload
-                )
-                
-                if final_res.status_code in [200, 201]:
-                    logger.info("🎉 Successfully pushed full transcript to Band.ai UI!")
-                else:
-                    logger.error(f"Failed to push transcript. API returned: {final_res.text}")
-        
-        asyncio.create_task(push_transcript())
 
     await room.connect(url, token)
     logger.info(f"Successfully connected to LiveKit room: {room_name}")
