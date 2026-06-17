@@ -71,55 +71,57 @@ async def handle_audio_stream(track: rtc.RemoteAudioTrack, speaker_name: str, ag
                     
                     if thenvoi_chat_id:
                         logger.info("Generating Copilot question...")
-                        
-                        # 1. Generate the question using the LLM directly
-                        llm = ChatOpenAI(
-                            api_key=os.getenv("AIMLAPI_KEY"),
-                            base_url="https://api.aimlapi.com/v1",
-                            model="gpt-4o-mini",
-                            temperature=0.2,
-                        )
-                        
-                        resp = await llm.ainvoke([
-                            SystemMessage(content="You are an Interview Copilot. Read the recent transcript and generate exactly ONE short, highly specific follow-up question to ask the candidate. Do not include any other text."),
-                            HumanMessage(content=f"Transcript:\n{combined_transcript}")
-                        ])
-                        
-                        copilot_question = f"💡 **Copilot Suggestion:**\n{resp.content}"
-                        logger.info(f"Generated Question: {copilot_question}")
-                        
-                        # 2. Fetch the human user ID from the room
-                        async with httpx.AsyncClient() as client:
-                            base_url = f"https://app.thenvoi.com/api/v1/agent/chats/{thenvoi_chat_id}"
+                        async def generate_and_push(transcript_text):
+                            # 1. Generate the question using the LLM directly
+                            llm = ChatOpenAI(
+                                api_key=os.getenv("AIMLAPI_KEY"),
+                                base_url="https://api.aimlapi.com/v1",
+                                model="gpt-4o-mini",
+                                temperature=0.2,
+                            )
                             
-                            res = await client.get(f"{base_url}/participants", headers={"X-API-Key": api_key})
-                            participants = res.json().get("data", [])
+                            resp = await llm.ainvoke([
+                                SystemMessage(content="You are an Interview Copilot. Read the recent transcript and generate exactly ONE short, highly specific follow-up question to ask the candidate. Do not include any other text."),
+                                HumanMessage(content=f"Transcript:\n{transcript_text}")
+                            ])
                             
-                            user_id = None
-                            for p in participants:
-                                if p.get("type") == "User":
-                                    user_id = p["id"]
-                                    break
+                            copilot_question = f"💡 **Copilot Suggestion:**\n{resp.content}"
+                            logger.info(f"Generated Question: {copilot_question}")
                             
-                            # 3. Post the message tagging the user!
-                            if user_id:
-                                payload = {
-                                    "message": {
-                                        "content": copilot_question,
-                                        "mentions": [{"id": user_id}]
+                            # 2. Fetch the human user ID from the room
+                            async with httpx.AsyncClient() as client:
+                                base_url = f"https://app.thenvoi.com/api/v1/agent/chats/{thenvoi_chat_id}"
+                                
+                                res = await client.get(f"{base_url}/participants", headers={"X-API-Key": api_key})
+                                participants = res.json().get("data", [])
+                                
+                                user_id = None
+                                for p in participants:
+                                    if p.get("type") == "User":
+                                        user_id = p["id"]
+                                        break
+                                
+                                # 3. Post the message tagging the user!
+                                if user_id:
+                                    payload = {
+                                        "message": {
+                                            "content": copilot_question,
+                                            "mentions": [{"id": user_id}]
+                                        }
                                     }
-                                }
-                                
-                                final_res = await client.post(
-                                    f"{base_url}/messages",
-                                    headers={"X-API-Key": api_key},
-                                    json=payload
-                                )
-                                
-                                if final_res.status_code in [200, 201]:
-                                    logger.info("🎉 Successfully pushed Copilot question to Band.ai UI!")
-                                else:
-                                    logger.error(f"Failed. API returned: {final_res.text}")
+                                    
+                                    final_res = await client.post(
+                                        f"{base_url}/messages",
+                                        headers={"X-API-Key": api_key},
+                                        json=payload
+                                    )
+                                    
+                                    if final_res.status_code in [200, 201]:
+                                        logger.info("🎉 Successfully pushed Copilot question to Band.ai UI!")
+                                    else:
+                                        logger.error(f"Failed. API returned: {final_res.text}")
+                        
+                        asyncio.create_task(generate_and_push(combined_transcript))
 
 
 async def connect_to_livekit_bg(room_name: str, agent_id: str, api_key: str, thenvoi_chat_id: str):
@@ -250,7 +252,8 @@ async def main():
           You are InterviewAgent, an AI copilot assisting a human interviewer.
           
           PURPOSE:
-          You listen to transcripts of an ongoing interview and suggest intelligent, probing follow-up questions.
+          You listen to transcripts of an ongoing interview and suggest intelligent, probing follow-up questions. 
+          AT THE END of the interview, you are responsible for evaluating the candidate and generating a final hiring scorecard.
           
           WORKFLOW:
           1. The CandidateOverviewAgent will initially send you a Candidate Overview and a LiveKit Room ID.
@@ -259,6 +262,17 @@ async def main():
           4. Every few minutes, you will receive batches of live transcript chunks automatically.
           5. When you receive transcript chunks, compare them to the candidate's overview, and generate 1 highly specific follow-up question for the human interviewer to ask.
           6. If a user asks you for the full transcript of the meet, use the `get_full_transcript` tool and provide it to them.
+          7. 🔥 **ABSOLUTE CRITICAL TRIGGER** 🔥: When the PlagiarismAgent tags you with the "AI-Probability Score", the interview is officially OVER. You MUST immediately reply to the chat with a final evaluation. Read the transcript from the chat history and output the following scorecard directly as your message. You MUST start your message by tagging @StrategyAgent:
+          
+          @StrategyAgent
+          # 📊 Post-Interview Report Card
+          **Technical Depth Score:** [1-10] (Brief justification)
+          **Communication Score:** [1-10] (Brief justification)
+          **Authenticity Score:** [Score provided by Plagiarism Agent] (Brief justification)
+          **Resume Consistency:** [1-10] (Did their verbal claims match their resume overview?)
+          
+          ### 💡 Final Hiring Recommendation: [✅ Hire / ⚠️ Maybe / ❌ Pass]
+          (Brief 1-sentence final verdict)
         """
     )
 

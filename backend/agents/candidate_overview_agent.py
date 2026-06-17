@@ -12,8 +12,48 @@ from langgraph.checkpoint.memory import InMemorySaver
 from thenvoi import Agent
 from thenvoi.adapters import LangGraphAdapter
 
+from langchain_core.tools import tool
+from services.database import get_db
+import uuid
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+@tool
+def save_and_fetch_candidate_snapshot(candidate_name: str, candidate_email: str, current_resume_data: str, current_github_data: str) -> str:
+    """
+    Saves the current candidate's data as a snapshot in the Universal Talent Network database.
+    If the candidate has applied before, it returns their PREVIOUS snapshot so you can analyze their growth!
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # 1. Ensure candidate exists
+    cursor.execute("SELECT id FROM candidates WHERE email = ?", (candidate_email,))
+    row = cursor.fetchone()
+    
+    if row:
+        candidate_id = row["id"]
+        # 2. Fetch the MOST RECENT snapshot (before we insert the new one)
+        cursor.execute("SELECT timestamp, resume_data, github_data FROM candidate_snapshots WHERE candidate_id = ? ORDER BY timestamp DESC LIMIT 1", (candidate_id,))
+        last_snapshot = cursor.fetchone()
+        
+        previous_data_str = "No previous snapshot found."
+        if last_snapshot:
+            previous_data_str = f"🔥 RETURNING CANDIDATE! PREVIOUS SNAPSHOT ({last_snapshot['timestamp']}):\nResume: {last_snapshot['resume_data']}\nGitHub: {last_snapshot['github_data']}"
+    else:
+        candidate_id = "cand_" + str(uuid.uuid4())[:8]
+        cursor.execute("INSERT INTO candidates (id, name, email) VALUES (?, ?, ?)", (candidate_id, candidate_name, candidate_email))
+        previous_data_str = "This is a first-time applicant. No previous historical data."
+        
+    # 3. Insert the new snapshot
+    cursor.execute("INSERT INTO candidate_snapshots (candidate_id, resume_data, github_data) VALUES (?, ?, ?)", 
+                   (candidate_id, current_resume_data, current_github_data))
+    
+    conn.commit()
+    conn.close()
+    
+    return previous_data_str
 
 async def main():
     load_dotenv()
@@ -31,11 +71,12 @@ async def main():
     adapter = LangGraphAdapter(
         llm=llm,
         checkpointer=InMemorySaver(),
+        additional_tools=[save_and_fetch_candidate_snapshot],
         custom_section="""
           You are CandidateOverviewAgent, the master orchestrator.
 
           PURPOSE:
-          Analyze the given GitHub Outputs and resume outputs, generate a combined profile overview, and then pass it to the InterviewAgent.
+          Analyze the given GitHub Outputs and resume outputs, check if the candidate has applied in the past (Delta Analysis), generate a combined profile overview, and then pass it to the InterviewAgent.
 
           CRITICAL RULES:
           - When sending a message to @ResumeAgent, you MUST paste the full Google Drive URL directly in your message text.
@@ -46,14 +87,17 @@ async def main():
           2. Wait for @ResumeAgent to reply with its extracted data and GitHub links. DO NOT proceed until you have received this reply.
           3. Once you receive the reply from @ResumeAgent, immediately send a message to @GithubAgent. Pass the GitHub links AND the job role to it, and explicitly tell it to run BOTH the profile stats tool and the projects reviewer tool.
           4. Wait for @GithubAgent to reply with the GitHub analysis. DO NOT proceed until you have received this reply.
+          5. ONCE BOTH AGENTS HAVE REPLIED, you MUST call the `save_and_fetch_candidate_snapshot` tool. Pass the candidate's name, email, and the raw text outputs from the Resume and GitHub agents. 
+          6. Wait for the tool result. If it returns a PREVIOUS SNAPSHOT, you MUST perform a "Delta Analysis" (analyze how much the candidate's skills have grown since their last application!).
           
-          5. ONCE BOTH AGENTS HAVE REPLIED, generate a single final message.
+          7. FINALLY, generate a single final message.
              - You MUST tag @InterviewAgent at the very beginning of this message.
              - You MUST include a LiveKit Room ID for the interview (you can make up a unique ID like "interview-room-123").
              - You MUST include the completely synthesized profile overview and suggested interview questions based on all the data.
+             - If they are a returning candidate, you MUST include a "📈 Growth Delta Report" summarizing how much they have improved since their last interview!
              
           Example of Final Message:
-          "@InterviewAgent Here is the Candidate Overview. The LiveKit Room ID is: test-room-123. [Insert full synthesized overview here]"
+          "@InterviewAgent Here is the Candidate Overview. The LiveKit Room ID is: test-room-123. [Insert full synthesized overview here. Insert Growth Delta Report if returning candidate.]"
         """
     )
 

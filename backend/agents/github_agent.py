@@ -16,6 +16,7 @@ from thenvoi import Agent
 from thenvoi.adapters import LangGraphAdapter
 
 from tools.github_tools import github_profile_stats, projects_reviewer
+from services.database import get_db 
 
 logging.basicConfig(level=logging.INFO)
 
@@ -35,37 +36,19 @@ async def main():
         temperature=0.2,
     )
 
+    # Fetch the dynamic prompt from the database!
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT instructions FROM agent_instructions WHERE agent_name = ?", ("GitHubAgent",))
+    row = cursor.fetchone()
+    dynamic_prompt = row["instructions"] if row else "You are GithubAgent."
+    conn.close()
+
     adapter = LangGraphAdapter(
         llm=llm,
         checkpointer=InMemorySaver(),
         additional_tools=[github_profile_stats, projects_reviewer],
-        custom_section="""
-          You are GithubAgent.
-
-          PURPOSE:
-          To fetch github profile statistics and profile fit of the candidate for the job role according to the code written by the user
-
-          TOOLS:
-
-          github_profile_stats(username)
-          projects_reviewer(role, repos)
-
-          WORKFLOW:
-
-          You MUST ALWAYS run BOTH the github_profile_stats tool AND the projects_reviewer tool.
-          
-          If the user provides a GitHub profile link or username (but no specific repositories):
-            1. Run github_profile_stats(username)
-            2. Run projects_reviewer(role, username=username) 
-          
-          If the user explicitly provides specific repository links with or without stating they are hyperlinks:
-            1. Run github_profile_stats(username)
-            2. Run projects_reviewer(role, repos=[repo1, repo2])
-            
-          Always use both tools before generating your final output.
-          
-          CRITICAL RULE: You MUST start your final response message by tagging @CandidateOverviewAgent so it knows you have finished. (e.g. "@CandidateOverviewAgent Here is the github analysis...")
-        """,
+        custom_section=dynamic_prompt # <-- Uses the database instead of hardcoded text
     )
 
     agent = Agent.create(
