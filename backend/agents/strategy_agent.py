@@ -88,12 +88,13 @@ async def main():
           
           YOUR IMMEDIATE TASKS:
           1. Read the full interview transcript from the chat history.
-          2. Identify ONE core technical skill or topic that the INTERVIEWER focused on heavily during the interview. You MUST base this SOLELY on the questions and requirements emphasized by the human interviewer in the transcript. Ignore the candidate's skills, answers, or shortcomings.
-          3. You MUST call the `update_agent_rubric` tool EXACTLY ONCE right now:
+          2. Identify the SINGLE most unique, specific technical framework, security concept, or architectural pattern the interviewer heavily grilled the candidate on (e.g., 'JWT Authentication', 'Firebase Security Rules', 'Data Encryption'). Do NOT pick generic languages like Python, JavaScript, or FastAPI. Pick the specific hard skill or concept they emphasized.
+          3. If you found a specific skill, you MUST call the `update_agent_rubric` tool EXACTLY ONCE right now:
              - Pass `agent_names=["ResumeAgent", "GitHubAgent"]`
-             - Pass `new_bonus_rule="[The Skill]"`
-          4. After calling the tool, you MUST output a final message to the chat saying exactly:
-             "⚙️ **System Strategy Update:** I noticed the interviewer heavily focused on [Skill]. I have permanently updated the Resume and GitHub agents to prioritize this skill for all future candidates."
+             - Pass `new_bonus_rule="[The Hyper-Specific Skill]"`
+             And then output: "⚙️ **System Strategy Update:** I noticed the interviewer heavily focused on [Skill]. I have permanently updated the Resume and GitHub agents to prioritize this skill for all future candidates."
+          4. If you could NOT find a specific skill because the interview was too short or generic, you MUST STILL output a final message saying exactly:
+             "⚙️ **System Strategy:** The interview was too short or generic to extract a new grading rubric. No changes were made."
         """
     )
 

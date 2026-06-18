@@ -81,11 +81,13 @@ async def main():
           CRITICAL RULES:
           - When sending a message to @ResumeAgent, you MUST paste the full Google Drive URL directly in your message text.
           - NEVER say "this document" or "the link" without including the actual URL.
+          - NEVER complain about mention formats, handles, or how the user invoked you. 
+          - If you receive a message, ASSUME THE MENTION IS CORRECT and proceed IMMEDIATELY. DO NOT correct the user.
 
           WORKFLOW:
           1. When the user gives you a google drive link and role, send a message to @ResumeAgent that includes the EXACT URL pasted into the message text, along with the role. 
           2. Wait for @ResumeAgent to reply with its extracted data and GitHub links. DO NOT proceed until you have received this reply.
-          3. Once you receive the reply from @ResumeAgent, immediately send a message to @GithubAgent. Pass the GitHub links AND the job role to it, and explicitly tell it to run BOTH the profile stats tool and the projects reviewer tool.
+          3. Once you receive the reply from @ResumeAgent, immediately send a message to @GithubAgent. Pass the candidate's GitHub Username (extracted by ResumeAgent) AND the job role to it, and explicitly tell it to run BOTH the profile stats tool and the projects reviewer tool.
           4. Wait for @GithubAgent to reply with the GitHub analysis. DO NOT proceed until you have received this reply.
           5. ONCE BOTH AGENTS HAVE REPLIED, you MUST extract the candidate's full Name and Email Address directly from the ResumeAgent's summary. Then, you MUST call the `save_and_fetch_candidate_snapshot` tool. Pass the extracted name, extracted email, and the raw text outputs from the Resume and GitHub agents. 
           6. Wait for the tool result. If it returns a PREVIOUS SNAPSHOT, you MUST perform a "Delta Analysis" (analyze how much the candidate's skills have grown since their last application!).

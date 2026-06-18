@@ -139,13 +139,17 @@ async def connect_to_livekit_bg(room_name: str, agent_id: str, api_key: str, the
         if track.kind == rtc.TrackKind.KIND_AUDIO:
             asyncio.create_task(handle_audio_stream(track, participant.identity, agent_id, api_key, thenvoi_chat_id))
 
+    has_pushed_transcript = False
+
     @room.on("participant_disconnected")
     def on_participant_disconnected(participant: rtc.RemoteParticipant):
         logger.info(f"Participant left the room: {participant.identity}")
         
         async def check_and_disconnect():
+            nonlocal has_pushed_transcript
             await asyncio.sleep(1) # wait for internal state to update
-            if not room.remote_participants:
+            if not room.remote_participants and not has_pushed_transcript:
+                has_pushed_transcript = True
                 logger.info("No humans left in the room. Pushing final transcript and disconnecting...")
                 
                 if full_transcript_buffer:
@@ -262,9 +266,8 @@ async def main():
           4. Every few minutes, you will receive batches of live transcript chunks automatically.
           5. When you receive transcript chunks, compare them to the candidate's overview, and generate 1 highly specific follow-up question for the human interviewer to ask.
           6. If a user asks you for the full transcript of the meet, use the `get_full_transcript` tool and provide it to them.
-          7. 🔥 **ABSOLUTE CRITICAL TRIGGER** 🔥: When the PlagiarismAgent tags you with the "AI-Probability Score", the interview is officially OVER. You MUST immediately reply to the chat with a final evaluation. Read the transcript from the chat history and output the following scorecard directly as your message. You MUST start your message by tagging @StrategyAgent:
+          7. 🔥 **ABSOLUTE CRITICAL TRIGGER** 🔥: When the PlagiarismAgent tags you with the "AI-Probability Score", the interview is officially OVER. You MUST immediately reply to the chat with a final evaluation. Read the transcript from the chat history and output the following scorecard directly as your message. Include the tag @StrategyAgent exactly ONCE at the very beginning of your message:
           
-          @StrategyAgent
           # 📊 Post-Interview Report Card
           **Technical Depth Score:** [1-10] (Brief justification)
           **Communication Score:** [1-10] (Brief justification)

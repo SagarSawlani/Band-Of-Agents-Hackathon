@@ -334,10 +334,12 @@ def github_profile_stats(username):
   """
     For the given Github Profile Username, this tool fetches the profile statistics
   """
-  user = g.get_user(username)
-
-  profile_stats = creation_date(user) + "\n" + commits_data(user) + "\n" + open_source_data(username)
-  return profile_stats
+  try:
+    user = g.get_user(username)
+    profile_stats = creation_date(user) + "\n" + commits_data(user) + "\n" + open_source_data(username)
+    return profile_stats
+  except Exception as e:
+    return f"Error fetching GitHub profile for {username}: {str(e)}. Please make sure you are passing a valid GitHub username (e.g. 'octocat'), NOT a full name."
 
 @tool
 def projects_reviewer(role, repos=None, username=None):
@@ -353,19 +355,27 @@ def projects_reviewer(role, repos=None, username=None):
       user_repos = list(user.get_repos(type="owner"))
       user_repos.sort(key=lambda x: x.stargazers_count, reverse=True)
       repos = [repo.full_name for repo in user_repos[:2]] # Top 2 repos to save time/context
-    except Exception:
-      pass
+    except Exception as e:
+      return f"Error finding repositories for username {username}: {str(e)}"
 
   if not repos:
     return "No repositories found to review."
 
   projects_review = ""
   for repo in repos:
-    projects_review += code_reviewer(role, repo)
+    try:
+      projects_review += code_reviewer(role, repo)
+    except Exception as e:
+      projects_review += f"\nError reviewing repo {repo}: {str(e)}. Make sure the repo name includes the owner (e.g. 'owner/repo').\n"
 
-  response = llm.invoke(
-    f"""
-      A review of all projects: {projects_review}. Make a combined Profile Review. follow the same format
-  """) 
+  if not projects_review.strip():
+      return "Could not review any repositories due to errors."
 
-  return response.content
+  try:
+    response = llm.invoke(
+      f"""
+        A review of all projects: {projects_review}. Make a combined Profile Review. follow the same format
+    """) 
+    return response.content
+  except Exception as e:
+    return f"Error generating combined review: {str(e)}"

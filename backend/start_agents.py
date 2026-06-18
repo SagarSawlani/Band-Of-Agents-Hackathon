@@ -19,11 +19,6 @@ agents = [
 
 processes = []
 
-print("Starting FastAPI Backend Server...")
-port = os.getenv("PORT", "8000")
-fastapi_process = subprocess.Popen([sys.executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", port])
-processes.append(("main.py (FastAPI)", fastapi_process))
-
 print("Starting all Band.ai Agents...")
 
 # Launch all agents in parallel
@@ -36,18 +31,14 @@ for agent in agents:
         print(f"Warning: Could not find {agent}")
 
 try:
-    # Keep the main script running so Railway doesn't kill the container
+    # Keep the main script running
     while True:
         time.sleep(1)
         # Check if any agent crashed
-        for agent, p in list(processes):  # iterate over a copy
+        for agent, p in list(processes):
             if p.poll() is not None:
                 print(f"CRITICAL: {agent} crashed with exit code {p.returncode}. Restarting...")
-                # Restart the crashed agent
-                if agent == "main.py (FastAPI)":
-                    new_p = subprocess.Popen([sys.executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", port])
-                else:
-                    new_p = subprocess.Popen([sys.executable, agent])
+                new_p = subprocess.Popen([sys.executable, agent])
                 processes.remove((agent, p))
                 processes.append((agent, new_p))
 except KeyboardInterrupt:
