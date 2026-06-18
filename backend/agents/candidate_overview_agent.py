@@ -102,7 +102,8 @@ async def main():
           # ❓ Suggested Interview Questions
           [Insert suggested questions]
           
-          **LiveKit Room ID:** interview-room-123
+          **Interview Room ID:** (random 5 digit number)
+          **Interview Link:** https://hireband.vercel.app/interview/Interview Room ID
         """
     )
 

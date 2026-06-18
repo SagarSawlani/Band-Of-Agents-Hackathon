@@ -88,7 +88,7 @@ async def main():
           
           YOUR IMMEDIATE TASKS:
           1. Read the full interview transcript from the chat history.
-          2. Identify ONE core technical skill or topic that the INTERVIEWER focused on heavily during the interview. You MUST base this SOLELY on the questions and requirements emphasized by the human interviewer in the transcript. Ignore the candidate's skills, answers, or shortcomings.
+          2. Identify ONE core technical skill or topic that the INTERVIEWER focused on heavily during the interview. You MUST base this SOLELY on the questions and requirements emphasized by the human interviewer in the transcript. Ignore the candidate's skills, answers, or shortcomings. Note that even if you are called in any other message, still you have to refer to the Full Interview Transcript in the chat and specifically observe what skill the interviewer focused the most on.
           3. You MUST call the `update_agent_rubric` tool EXACTLY ONCE right now:
              - Pass `agent_names=["ResumeAgent", "GitHubAgent"]`
              - Pass `new_bonus_rule="[The Skill]"`
