@@ -19,6 +19,11 @@ agents = [
 
 processes = []
 
+print("Starting FastAPI Backend Server...")
+port = os.getenv("PORT", "8000")
+fastapi_process = subprocess.Popen([sys.executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", port])
+processes.append(("main.py (FastAPI)", fastapi_process))
+
 print("Starting all Band.ai Agents...")
 
 # Launch all agents in parallel

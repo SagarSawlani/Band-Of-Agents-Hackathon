@@ -24,8 +24,9 @@ export default function InterviewRoom() {
 
     const roomName = roomId;
 
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
     const res = await fetch(
-      `http://localhost:8000/token?room=${roomName}&name=${username}`
+      `${backendUrl}/token?room=${roomName}&name=${username}`
     );
 
     const data = await res.json();
