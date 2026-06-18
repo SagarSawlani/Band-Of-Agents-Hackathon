@@ -145,7 +145,7 @@ async def main():
         api_key=api_key,
     )
 
-    logger.info("PlagiarismAgent running with Dual Detection Pipeline! Waiting for transcripts...")
+    logger.info("PlagiarismAgent running.Waiting for transcripts...")
     await agent.run()
 
 if __name__ == "__main__":

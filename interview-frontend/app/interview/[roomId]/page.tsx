@@ -10,17 +10,17 @@ import {
 
 import "@livekit/components-styles";
 
-import ParticipantsPanel from "../../components/ParticipantsPanel";
-
 export default function InterviewRoom() {
   const params = useParams();
   const roomId = params.roomId as string;
 
   const [token, setToken] = useState("");
   const [connected, setConnected] = useState(false);
+  const [username, setUsername] = useState("");
 
-  async function joinRoom() {
-    const username = prompt("Enter your name") || "Guest";
+  async function joinRoom(e: React.FormEvent) {
+    e.preventDefault();
+    if (!username.trim()) return;
 
     const roomName = roomId;
 
@@ -42,80 +42,76 @@ export default function InterviewRoom() {
           height: "100vh",
           justifyContent: "center",
           alignItems: "center",
+          backgroundColor: "#202124",
+          fontFamily: "sans-serif",
         }}
       >
-        <button onClick={joinRoom}>
-          Join Interview
-        </button>
+        <div
+          style={{
+            backgroundColor: "#ffffff",
+            padding: "40px",
+            borderRadius: "8px",
+            boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+            textAlign: "center",
+            width: "100%",
+            maxWidth: "400px",
+          }}
+        >
+          <h1 style={{ color: "#202124", marginBottom: "8px", fontSize: "24px" }}>Ready to join?</h1>
+          <p style={{ color: "#5f6368", marginBottom: "24px" }}>Please enter your name to enter the interview.</p>
+          
+          <form onSubmit={joinRoom} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <input
+              type="text"
+              placeholder="Your Name"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              style={{
+                padding: "12px",
+                fontSize: "16px",
+                borderRadius: "4px",
+                border: "1px solid #dadce0",
+                outline: "none",
+                color: "#202124",
+              }}
+              autoFocus
+            />
+            <button 
+              type="submit"
+              disabled={!username.trim()}
+              style={{
+                backgroundColor: username.trim() ? "#1a73e8" : "#e8eaed",
+                color: username.trim() ? "#ffffff" : "#9aa0a6",
+                padding: "12px",
+                fontSize: "16px",
+                fontWeight: "bold",
+                border: "none",
+                borderRadius: "4px",
+                cursor: username.trim() ? "pointer" : "default",
+                transition: "background-color 0.2s"
+              }}
+            >
+              Join Interview
+            </button>
+          </form>
+        </div>
       </div>
     );
   }
 
   return (
-    <LiveKitRoom
-      token={token}
-      serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
-      connect={true}
-      video={true}
-      audio={true}
-      style={{ height: "100vh" }}
-    >
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "250px 1fr 350px",
-          height: "100%",
-        }}
+    <div style={{ height: "100vh", backgroundColor: "#202124" }}>
+      <LiveKitRoom
+        token={token}
+        serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
+        connect={true}
+        video={true}
+        audio={true}
+        data-lk-theme="default"
+        style={{ height: "100%" }}
       >
-        {/* LEFT PANEL */}
-        <div
-          style={{
-            borderRight: "1px solid #ddd",
-            padding: "16px",
-            overflowY: "auto",
-          }}
-        >
-          <ParticipantsPanel />
-        </div>
-
-        {/* CENTER PANEL */}
-        <div style={{ height: "100%" }}>
-          <VideoConference />
-        </div>
-
-        {/* RIGHT PANEL */}
-        <div
-          style={{
-            borderLeft: "1px solid #ddd",
-            padding: "16px",
-            overflowY: "auto",
-          }}
-        >
-          <h2>Live Transcript</h2>
-
-          <div
-            style={{
-              minHeight: "200px",
-              border: "1px solid #ddd",
-              padding: "12px",
-              marginBottom: "20px",
-            }}
-          >
-            Waiting for transcription...
-          </div>
-
-          <h2>AI Suggestions</h2>
-
-          <div
-            style={{
-              border: "1px solid #ddd",
-              padding: "12px",
-            }}
-          >
-            Waiting for candidate response...
-          </div>
-        </div>
-      </div>
-    </LiveKitRoom>
+        <VideoConference />
+      </LiveKitRoom>
+    </div>
   );
 }
