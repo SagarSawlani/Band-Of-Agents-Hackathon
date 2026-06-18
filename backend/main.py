@@ -23,6 +23,10 @@ LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
 
 app.include_router(create_meet_router)
 
+@app.get("/")
+async def health_check():
+    return {"status": "healthy"}
+
 @app.get("/token")
 async def get_token(room: str, name: str):
 

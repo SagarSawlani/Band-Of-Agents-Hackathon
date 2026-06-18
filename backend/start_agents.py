@@ -40,11 +40,14 @@ try:
     while True:
         time.sleep(1)
         # Check if any agent crashed
-        for agent, p in processes:
+        for agent, p in list(processes):  # iterate over a copy
             if p.poll() is not None:
                 print(f"CRITICAL: {agent} crashed with exit code {p.returncode}. Restarting...")
                 # Restart the crashed agent
-                new_p = subprocess.Popen([sys.executable, agent])
+                if agent == "main.py (FastAPI)":
+                    new_p = subprocess.Popen([sys.executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", port])
+                else:
+                    new_p = subprocess.Popen([sys.executable, agent])
                 processes.remove((agent, p))
                 processes.append((agent, new_p))
 except KeyboardInterrupt:
