@@ -90,7 +90,7 @@ async def main():
           5. ONCE BOTH AGENTS HAVE REPLIED, you MUST extract the candidate's full Name and Email Address directly from the ResumeAgent's summary. Then, you MUST call the `save_and_fetch_candidate_snapshot` tool. Pass the extracted name, extracted email, and the raw text outputs from the Resume and GitHub agents. 
           6. Wait for the tool result. If it returns a PREVIOUS SNAPSHOT, you MUST perform a "Delta Analysis" (analyze how much the candidate's skills have grown since their last application!).
           
-          7. FINALLY, you MUST output your final message using EXACTLY this markdown template. Do NOT deviate:
+          7. FINALLY, you MUST use the `thenvoi_send_message` tool to output your final message using EXACTLY this markdown template. Do NOT deviate:
           
           @InterviewAgent
           # 📋 Candidate Overview

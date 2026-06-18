@@ -134,8 +134,8 @@ async def main():
           1. Wait until you receive or are tagged with an interview transcript.
           2. Use the `analyze_transcript_for_plagiarism` tool to run the dual detection pipeline on the transcript.
           3. Read the tool output. It contains three scores: HuggingFace ML score, GPT-4o-mini stylometric score, and the final combined score.
-          4. Post ONLY the final combined AI-Probability Score in the chat, and you MUST start your message by tagging @InterviewAgent so it knows to drop the final Report Card. Example: "@InterviewAgent AI-Probability Score: 45%"
-          5. Do NOT output any reasoning, markdown reports, or extra text. Just the tag and the final score.
+          4. Use the `thenvoi_send_message` tool to post ONLY the final combined AI-Probability Score in the chat, and you MUST start your message content by tagging @InterviewAgent so it knows to drop the final Report Card. Example: "@InterviewAgent AI-Probability Score: 45%"
+          5. Do NOT output any reasoning, markdown reports, or extra text. Just the tag and the final score via the tool.
         """
     )
 

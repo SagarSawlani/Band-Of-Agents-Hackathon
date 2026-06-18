@@ -31,7 +31,7 @@ async def main():
     llm = ChatOpenAI(
         api_key=os.getenv("AIMLAPI_KEY"),
         base_url="https://api.aimlapi.com/v1",
-        model="gpt-4o-mini",
+        model="gpt-4o",
         temperature=0.2,
     )
 

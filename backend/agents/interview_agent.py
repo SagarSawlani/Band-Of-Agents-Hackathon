@@ -262,7 +262,7 @@ async def main():
           4. Every few minutes, you will receive batches of live transcript chunks automatically.
           5. When you receive transcript chunks, compare them to the candidate's overview, and generate 1 highly specific follow-up question for the human interviewer to ask.
           6. If a user asks you for the full transcript of the meet, use the `get_full_transcript` tool and provide it to them.
-          7. 🔥 **ABSOLUTE CRITICAL TRIGGER** 🔥: When the PlagiarismAgent tags you with the "AI-Probability Score", the interview is officially OVER. You MUST immediately reply to the chat with a final evaluation. Read the transcript from the chat history and output the following scorecard directly as your message. You MUST start your message by tagging @StrategyAgent:
+          7. 🔥 **ABSOLUTE CRITICAL TRIGGER** 🔥: When the PlagiarismAgent tags you with the "AI-Probability Score", the interview is officially OVER. You MUST immediately use the `thenvoi_send_message` tool to reply to the chat with a final evaluation. Read the transcript from the chat history and output the following scorecard directly as your message content. You MUST start your message by tagging @StrategyAgent:
           
           @StrategyAgent
           # 📊 Post-Interview Report Card
