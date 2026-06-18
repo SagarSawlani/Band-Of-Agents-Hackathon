@@ -3,6 +3,7 @@ import os
 import re
 import logging
 import asyncio
+import requests
 from dotenv import load_dotenv
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -18,13 +19,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ─── Load HuggingFace model once at startup (avoid reloading on every call) ───
-logger.info("Loading HuggingFace DistilBERT AI detector model...")
-from transformers import pipeline as hf_pipeline
-hf_detector = hf_pipeline(
-    "text-classification",
-    model="ahmediqbal/ai-text-detector-model"
-)
-logger.info("HuggingFace model loaded successfully!")
+# --- LOCAL MODEL (Commented out for Render deployment to save RAM) ---
+# logger.info("Loading HuggingFace DistilBERT AI detector model...")
+# from transformers import pipeline as hf_pipeline
+# hf_detector = hf_pipeline(
+#     "text-classification",
+#     model="ahmediqbal/ai-text-detector-model"
+# )
+# logger.info("HuggingFace model loaded successfully!")
 
 
 # ─── Helper: Strip dialogue labels ───
@@ -37,14 +39,43 @@ def clean_transcript(text: str) -> str:
 
 # ─── Helper: Get HuggingFace score ───
 def get_hf_score(text: str) -> float:
-    """Run the lightweight DistilBERT AI detector locally. Returns 0-100."""
-    result = hf_detector(text)
-    label = result[0]['label']
-    score = result[0]['score']
-    if label.upper() == 'AI':
-        return round(score * 100, 2)
-    else:
-        return round((1.0 - score) * 100, 2)
+    """Run the lightweight DistilBERT AI detector. Configured for HF API to save RAM on Render."""
+    
+    # --- LOCAL INFERENCE (Commented out) ---
+    # result = hf_detector(text)
+    # label = result[0]['label']
+    # score = result[0]['score']
+    # if label.upper() == 'AI':
+    #     return round(score * 100, 2)
+    # else:
+    #     return round((1.0 - score) * 100, 2)
+
+    # --- HUGGINGFACE API INFERENCE ---
+    try:
+        API_URL = "https://api-inference.huggingface.co/models/ahmediqbal/ai-text-detector-model"
+        # We assume you added HUGGINGFACE_API_KEY to your .env file
+        headers = {"Authorization": f"Bearer {os.getenv('HUGGINGFACE_API_KEY')}"}
+        
+        response = requests.post(API_URL, headers=headers, json={"inputs": text})
+        result = response.json()
+        
+        # The API returns a list of lists: [[{'label': 'AI', 'score': 0.99}, {'label': 'HUMAN', 'score': 0.01}]]
+        if isinstance(result, list) and len(result) > 0 and isinstance(result[0], list):
+            predictions = sorted(result[0], key=lambda x: x['score'], reverse=True)
+            top_prediction = predictions[0]
+            label = top_prediction['label']
+            score = top_prediction['score']
+            
+            if label.upper() == 'AI':
+                return round(score * 100, 2)
+            else:
+                return round((1.0 - score) * 100, 2)
+        else:
+            logger.error(f"Unexpected API response: {result}")
+            return 50.0 # fallback
+    except Exception as e:
+        logger.error(f"HF API Error: {e}")
+        return 50.0 # fallback if API fails
 
 
 # ─── Tool: Dual AI Detection ───
