@@ -21,7 +21,7 @@ processes = []
 
 print("Starting FastAPI Backend Server...")
 port = os.getenv("PORT", "8000")
-fastapi_process = subprocess.Popen([sys.executable, "-m", "uvicorn", "main:app", "--host", "::", "--port", port])
+fastapi_process = subprocess.Popen([sys.executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", port])
 processes.append(("main.py (FastAPI)", fastapi_process))
 
 print("Starting all Band.ai Agents...")
@@ -45,7 +45,7 @@ try:
                 print(f"CRITICAL: {agent} crashed with exit code {p.returncode}. Restarting...")
                 # Restart the crashed agent
                 if agent == "main.py (FastAPI)":
-                    new_p = subprocess.Popen([sys.executable, "-m", "uvicorn", "main:app", "--host", "::", "--port", port])
+                    new_p = subprocess.Popen([sys.executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", port])
                 else:
                     new_p = subprocess.Popen([sys.executable, agent])
                 processes.remove((agent, p))
