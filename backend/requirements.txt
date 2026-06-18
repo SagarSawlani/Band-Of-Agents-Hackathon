@@ -13,3 +13,5 @@ PyGithub
 requests
 pdfminer.six 
 python-docx
+transformers
+torch
