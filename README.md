@@ -93,4 +93,4 @@ Visit `http://localhost:3000` to access the live interview dashboard!
 
 ---
 
-## 🤝 Built for the Band.ai Hackathon 2026
+## 🤝 Built for the Band Of Agents Hackathon 2026
